@@ -1,18 +1,18 @@
 package http
 
 import (
-	"bufio"
-	"io"
 	"log"
 	"net"
+	"net/http"
 	"net/textproto"
 )
 
 type Server struct {
-	Addr string
+	Addr    string
+	Handler HandleFunc
 }
 
-func (s Server) Listen() error {
+func (s *Server) Listen() error {
 	log.Println("opening tcp socket...")
 	lis, err := net.Listen("tcp", s.Addr)
 	if err != nil {
@@ -29,53 +29,30 @@ func (s Server) Listen() error {
 		}
 		log.Println("accepted connection")
 
-		go s.Handle(conn)
+		go s.handleConnection(conn)
 	}
 }
 
-func (s Server) Handle(c net.Conn) {
-	req := Request{}
-	// res := Response{
-	// 	StatusLine: StatusLine{
-	// 		StatusCode:   200,
-	// 		ReasonPhrase: "OK",
-	// 	},
-	// }
+func (s *Server) handleConnection(c net.Conn) {
+	defer c.Close()
+	tp := textproto.NewConn(c)
 
-	reader := bufio.NewReader(c)
-	tp := textproto.NewReader(reader)
-
-	var reqLine string
-	var err error
-	if reqLine, err = tp.ReadLine(); err != nil {
+	req, err1 := http.ReadRequest(tp.R)
+	if err1 != nil {
 		return
 	}
-	defer func() {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-	}()
+	log.Println(req.Method)
 
-	requestLine, err := ParseRequestLine(reqLine)
+	res, err := s.Handler(req)
 	if err != nil {
-		log.Fatalf("failed to parse request line: %v", err.Error())
+		res.Status = "500 Internal Server Error"
+		res.Header.Add("Content-Type", "text/plain")
+	}
+
+	err = res.Write(c)
+	if err != nil {
+		log.Fatalf("failed to write response: %v", err.Error())
 		return
 	}
-	req.RequestLine = requestLine
-
-	header, err := tp.ReadMIMEHeader()
-	if err != nil {
-		log.Fatalf("failed to parse mime headers: %v", err.Error())
-		return
-	}
-	req.Headers = header
-
-	str, err := tp.ReadLine()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println(str)
-
-	c.Write([]byte("HTTP/1.1 200 OK\r\n\r\nHi\r\n"))
 	c.Close()
 }

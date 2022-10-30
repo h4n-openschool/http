@@ -25,6 +25,8 @@ type Request struct {
 
 	// Body optionally represents the body of the request.
 	Body string
+
+	Query map[string]string
 }
 
 // ParseRequestLine takes a single line as input and returns a parsed
