@@ -1,4 +1,4 @@
-module github.com/openschool/http
+module github.com/h4n-openschool/http
 
 go 1.19
 

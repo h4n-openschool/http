@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/openschool/http"
+	"github.com/h4n-openschool/http"
 )
 
 func main() {

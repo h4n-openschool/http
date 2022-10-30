@@ -3,7 +3,7 @@ package http_test
 import (
 	"testing"
 
-	"github.com/openschool/http"
+	"github.com/h4n-openschool/http"
 	"github.com/stretchr/testify/assert"
 )
 
