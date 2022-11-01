@@ -1,10 +1,11 @@
 package http
 
 import (
+	"bufio"
 	"log"
 	"net"
 	"net/http"
-	"net/textproto"
+	"time"
 )
 
 type Server struct {
@@ -20,14 +21,25 @@ func (s *Server) Listen() error {
 	}
 	defer lis.Close()
 
-	log.Println("beginning accept loop...")
 	for {
 		conn, err := lis.Accept()
 		if err != nil {
 			log.Println("failed to accept connection, closing...")
 			conn.Close()
+			continue
 		}
-		log.Println("accepted connection")
+		now := time.Now()
+
+		if err := conn.SetReadDeadline(now.Add(5 * time.Second)); err != nil {
+			log.Println("failed to set read deadline, closing...")
+			conn.Close()
+			continue
+		}
+		if err := conn.SetWriteDeadline(now.Add(30 * time.Second)); err != nil {
+			log.Println("failed to set write deadline, closing...")
+			conn.Close()
+			continue
+		}
 
 		go s.handleConnection(conn)
 	}
@@ -35,15 +47,25 @@ func (s *Server) Listen() error {
 
 func (s *Server) handleConnection(c net.Conn) {
 	defer c.Close()
-	tp := textproto.NewConn(c)
+	reader := bufio.NewReader(c)
 
-	req, err1 := http.ReadRequest(tp.R)
-	if err1 != nil {
+	req, err := http.ReadRequest(reader)
+	if err != nil {
 		return
 	}
-	log.Println(req.Method)
 
-	res, err := s.Handler(req)
+	if res := validRequest(req); res != nil {
+		res.Write(c)
+		c.Close()
+		return
+	}
+
+	ctx := Context{
+		Request:    req,
+		RemoteAddr: c.RemoteAddr(),
+	}
+
+	res, err := s.Handler(&ctx)
 	if err != nil {
 		res.Status = "500 Internal Server Error"
 		res.Header.Add("Content-Type", "text/plain")
