@@ -2,6 +2,8 @@ package server
 
 import (
 	"bufio"
+	"bytes"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -10,7 +12,7 @@ import (
 
 type Server struct {
 	Addr    string
-	Handler HandleFunc
+	Handler http.Handler
 }
 
 func (s *Server) Listen() error {
@@ -49,27 +51,25 @@ func (s *Server) handleConnection(c net.Conn) {
 	defer c.Close()
 	reader := bufio.NewReader(c)
 
-	req, err := http.ReadRequest(reader)
+	r, err := http.ReadRequest(reader)
 	if err != nil {
 		return
 	}
 
-	if res := validRequest(req); res != nil {
+	if res := validRequest(r); res != nil {
 		res.Write(c)
 		c.Close()
 		return
 	}
 
-	ctx := Context{
-		Request:    req,
-		RemoteAddr: c.RemoteAddr(),
-	}
+	w := NewOSResponseWriter()
+	s.Handler.ServeHTTP(w, r)
 
-	res, err := s.Handler(&ctx)
-	if err != nil {
-		res.Status = "500 Internal Server Error"
-		res.Header.Add("Content-Type", "text/plain")
-	}
+	res := NewResponse()
+	res.StatusCode = w.statusCode
+	res.Header = w.header
+	res.Body = io.NopCloser(bytes.NewReader(w.body))
+	res = SetBody(res, w.body)
 
 	err = res.Write(c)
 	if err != nil {

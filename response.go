@@ -1,9 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"io"
 	"net/http"
-	"strings"
 )
 
 func NewResponse() http.Response {
@@ -15,7 +15,7 @@ func NewResponse() http.Response {
 	}
 }
 
-func SetBody(r http.Response, s string) http.Response {
-	r.Body = io.NopCloser(strings.NewReader(s))
+func SetBody(r http.Response, b []byte) http.Response {
+	r.Body = io.NopCloser(bytes.NewReader(b))
 	return r
 }
