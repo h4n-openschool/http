@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"io"
 	"log"
 	"net"
@@ -13,11 +14,21 @@ import (
 type Server struct {
 	Addr    string
 	Handler http.Handler
+	TLS     *tls.Config
 }
 
 func (s *Server) Listen() error {
 	log.Println("opening tcp socket...")
-	lis, err := net.Listen("tcp", s.Addr)
+
+	var lis net.Listener
+	var err error
+
+	if s.TLS != nil {
+		lis, err = tls.Listen("tcp", s.Addr, s.TLS)
+	} else {
+		lis, err = net.Listen("tcp", s.Addr)
+	}
+
 	if err != nil {
 		return err
 	}
